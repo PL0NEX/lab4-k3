@@ -1,16 +1,29 @@
-﻿using FinancePlannerAPI.Controllers;
+using FinancePlannerAPI.Controllers;
 using FinancePlannerAPI.Domain.Entities;
 using FinancePlannerAPI.Domain.Interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Moq;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace FinancePlannerAPI.UnitTests
 {
     [TestClass]
-    public class CategoriesControllerTests
+    public class CategoryControllerTests
     {
+        private Mock<ICategoryService> _serviceMock;
+        private Mock<ILogger<CategoryController>> _loggerMock;
+        private CategoryController _controller;
+
+        [TestInitialize]
+        public void Setup()
+        {
+            _serviceMock = new Mock<ICategoryService>();
+            _loggerMock = new Mock<ILogger<CategoryController>>();
+            _controller = new CategoryController(_serviceMock.Object, _loggerMock.Object);
+        }
+
         [TestMethod]
         public async Task GetCategoryById_Success()
         {
@@ -20,16 +33,13 @@ namespace FinancePlannerAPI.UnitTests
             {
                 Id = categoryId,
                 UserId = Guid.NewGuid(),
-                Name = "Test Category"
+                Name = "Tестовая категория"
             };
 
-            var serviceMock = new Mock<ICategoryService>();
-            serviceMock.Setup(x => x.GetCategoryByIdAsync(categoryId)).ReturnsAsync(category);
-
-            var controller = new CategoriesController(serviceMock.Object);
+            _serviceMock.Setup(x => x.GetCategoryByIdAsync(categoryId)).ReturnsAsync(category);
 
             // Act
-            var result = await controller.GetCategoryById(categoryId);
+            var result = await _controller.GetCategoryById(categoryId);
 
             // Assert
             Assert.IsInstanceOfType(result, typeof(OkObjectResult));
@@ -43,17 +53,15 @@ namespace FinancePlannerAPI.UnitTests
         {
             // Arrange
             var categoryId = Guid.NewGuid();
-
-            var serviceMock = new Mock<ICategoryService>();
-            serviceMock.Setup(x => x.GetCategoryByIdAsync(categoryId)).ReturnsAsync((Category)null);
-
-            var controller = new CategoriesController(serviceMock.Object);
+            _serviceMock.Setup(x => x.GetCategoryByIdAsync(categoryId)).ReturnsAsync((Category)null);
 
             // Act
-            var result = await controller.GetCategoryById(categoryId);
+            var result = await _controller.GetCategoryById(categoryId);
 
             // Assert
             Assert.IsInstanceOfType(result, typeof(NotFoundObjectResult));
+            var notFoundResult = result as NotFoundObjectResult;
+            Assert.AreEqual("Категория не найдена", notFoundResult?.Value);
         }
 
         [TestMethod]
@@ -61,19 +69,17 @@ namespace FinancePlannerAPI.UnitTests
         {
             // Arrange
             var categoryId = Guid.NewGuid();
-
-            var serviceMock = new Mock<ICategoryService>();
-            serviceMock.Setup(x => x.GetCategoryByIdAsync(categoryId))
-                       .ThrowsAsync(new Exception("Internal server error"));
-
-            var controller = new CategoriesController(serviceMock.Object);
+            _serviceMock.Setup(x => x.GetCategoryByIdAsync(categoryId))
+                        .ThrowsAsync(new Exception("Internal server error"));
 
             // Act
-            var result = await controller.GetCategoryById(categoryId);
+            var result = await _controller.GetCategoryById(categoryId);
 
             // Assert
-            Assert.IsInstanceOfType(result, typeof(StatusCodeResult));
-            Assert.AreEqual(StatusCodes.Status500InternalServerError, (result as StatusCodeResult)?.StatusCode);
+            Assert.IsInstanceOfType(result, typeof(ObjectResult));
+            var objectResult = result as ObjectResult;
+            Assert.AreEqual(StatusCodes.Status500InternalServerError, objectResult?.StatusCode);
+            Assert.AreEqual("Произошла неизвестная ошибка", objectResult?.Value);
         }
     }
 }
